@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MistyNote Admin — Shipping</title>
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --surface: #14141c;
+    --surface2: #1c1c26;
+    --border: #232330;
+    --text: #f5f5f7;
+    --text2: #a8a8b3;
+    --text3: #6b6b78;
+    --accent: #6C47FF;
+    --orange: #ff9500;
+    --purple: #6C47FF;
+    --green: #00c48c;
+    --red: #ff3b5c;
+    --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font);
+    min-height: 100vh;
+  }
+
+  /* ── Header ── */
+  header {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 16px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .brand { display: flex; align-items: center; gap: 10px; }
+  .brand-logo {
+    width: 32px; height: 32px; border-radius: 9px;
+    background: linear-gradient(135deg, #FF1080, #7722EE);
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 800; font-size: 14px;
+  }
+  .brand-text { font-size: 15px; font-weight: 700; letter-spacing: -0.2px; }
+  .brand-sub { font-size: 11px; color: var(--text3); }
+  #signout-btn {
+    background: none; border: 1px solid var(--border); color: var(--text2);
+    border-radius: 10px; padding: 8px 14px; font-size: 13px; cursor: pointer;
+    font-family: var(--font);
+  }
+
+  /* ── Tabs ── */
+  .tabs {
+    display: flex; gap: 8px; padding: 16px 20px 0;
+    overflow-x: auto;
+  }
+  .tab {
+    padding: 10px 16px; border-radius: 10px; font-size: 13px; font-weight: 600;
+    color: var(--text2); background: var(--surface); border: 1px solid var(--border);
+    cursor: pointer; white-space: nowrap; display: flex; align-items: center; gap: 6px;
+  }
+  .tab.active { background: var(--accent); color: white; border-color: var(--accent); }
+  .tab-count {
+    background: rgba(255,255,255,0.15); border-radius: 8px; padding: 1px 7px; font-size: 11px;
+  }
+
+  /* ── Content ── */
+  main { padding: 16px 20px 60px; max-width: 720px; margin: 0 auto; }
+
+  .empty {
+    text-align: center; padding: 60px 20px; color: var(--text3);
+  }
+  .empty-icon { font-size: 36px; margin-bottom: 12px; }
+  .empty-text { font-size: 14px; }
+
+  .req-card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 16px;
+    padding: 16px; margin-bottom: 12px;
+  }
+  .req-top {
+    display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;
+  }
+  .req-item { font-size: 14px; font-weight: 700; }
+  .req-store { font-size: 12px; color: var(--text3); margin-top: 2px; }
+  .req-value { font-size: 14px; font-weight: 700; color: var(--green); }
+
+  .req-section {
+    background: var(--surface2); border-radius: 12px; padding: 12px 14px; margin-bottom: 10px;
+  }
+  .req-label {
+    font-size: 10px; font-weight: 700; color: var(--text3); text-transform: uppercase;
+    letter-spacing: 0.6px; margin-bottom: 8px;
+  }
+  .req-row { display: flex; gap: 8px; font-size: 13px; margin-bottom: 4px; }
+  .req-row b { color: var(--text); font-weight: 600; }
+  .req-row span { color: var(--text2); }
+
+  .req-meta { display: flex; gap: 14px; font-size: 12px; color: var(--text3); margin-bottom: 12px; }
+
+  .req-actions { display: flex; gap: 8px; }
+  .btn {
+    flex: 1; height: 42px; border-radius: 10px; border: none; font-size: 13px; font-weight: 700;
+    cursor: pointer; font-family: var(--font);
+  }
+  .btn-primary { background: var(--accent); color: white; }
+  .btn-secondary { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+  .btn-green { background: var(--green); color: #06120d; }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  /* ── Modal ── */
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 100;
+    display: none; align-items: center; justify-content: center; padding: 20px;
+  }
+  .modal-overlay.show { display: flex; }
+  .modal {
+    background: var(--surface); border-radius: 18px; padding: 24px; width: 100%; max-width: 400px;
+    border: 1px solid var(--border);
+  }
+  .modal h2 { font-size: 16px; margin-bottom: 16px; }
+  .modal label { display: block; font-size: 12px; color: var(--text2); margin-bottom: 6px; font-weight: 600; }
+  .modal input {
+    width: 100%; height: 44px; background: var(--bg); border: 1px solid var(--border);
+    border-radius: 10px; color: var(--text); padding: 0 12px; font-size: 14px; font-family: var(--font);
+    margin-bottom: 14px; outline: none;
+  }
+  .modal input:focus { border-color: var(--accent); }
+  .modal-actions { display: flex; gap: 8px; margin-top: 4px; }
+
+  .loading { text-align: center; padding: 40px; color: var(--text3); font-size: 13px; }
+
+  .status-pill {
+    font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 8px;
+  }
+  .status-pending  { background: rgba(255,149,0,0.12); color: var(--orange); }
+  .status-shipped   { background: rgba(108,71,255,0.12); color: var(--purple); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <div class="brand-logo">M</div>
+    <div>
+      <div class="brand-text">MistyNote Admin</div>
+      <div class="brand-sub" id="staff-email">—</div>
+    </div>
+  </div>
+  <button id="signout-btn">Sign Out</button>
+</header>
+
+<div class="tabs">
+  <div class="tab active" data-tab="pending">📦 Pending Pickup <span class="tab-count" id="count-pending">0</span></div>
+  <div class="tab" data-tab="shipped">🚚 Shipped <span class="tab-count" id="count-shipped">0</span></div>
+</div>
+
+<main id="content">
+  <div class="loading">Loading…</div>
+</main>
+
+<!-- Mark Shipped Modal -->
+<div class="modal-overlay" id="ship-modal">
+  <div class="modal">
+    <h2>Mark as Shipped</h2>
+    <label>Courier Name</label>
+    <input type="text" id="modal-courier" placeholder="e.g. GIG Logistics, DHL, Local Dispatch">
+    <label>Tracking Number (optional)</label>
+    <input type="text" id="modal-tracking" placeholder="Waybill or tracking number">
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeShipModal()">Cancel</button>
+      <button class="btn btn-primary" id="modal-confirm-ship" onclick="confirmMarkShipped()">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+  const SUPABASE_URL = 'https://rhmknjlxddxkfyjbcfgjj.supabase.co';
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJobWtuamx4ZGR4a2Z5YmNmZ2pqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk0MzM4OTgsImV4cCI6MjA4NTAwOTg5OH0.dNBxXmIdYAxJT-bt1WWcO62Nobt8aDLTRdnrs5g1CCI';
+
+  const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  let currentTab = 'pending';
+  let activeRequestId = null;
+  let activeOrderId = null;
+
+  // ── Auth guard ──
+  (async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) { window.location.href = 'index.html'; return; }
+
+    const { data: staff } = await supabase
+      .from('admin_staff')
+      .select('id')
+      .eq('user_id', session.user.id)
+      .maybeSingle();
+
+    if (!staff) {
+      await supabase.auth.signOut();
+      window.location.href = 'index.html';
+      return;
+    }
+
+    document.getElementById('staff-email').textContent = session.user.email;
+    loadData();
+  })();
+
+  document.getElementById('signout-btn').onclick = async () => {
+    await supabase.auth.signOut();
+    window.location.href = 'index.html';
+  };
+
+  document.querySelectorAll('.tab').forEach(tab => {
+    tab.onclick = () => {
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      currentTab = tab.dataset.tab;
+      render();
+    };
+  });
+
+  let pendingRequests = [];
+  let shippedOrders   = [];
+
+  async function loadData() {
+    const content = document.getElementById('content');
+    content.innerHTML = '<div class="loading">Loading…</div>';
+
+    const [{ data: pending }, { data: shipped }] = await Promise.all([
+      supabase.from('pickup_requests').select('*').eq('status', 'pending').order('requested_at', { ascending: true }),
+      supabase.from('orders').select('*').eq('status', 'shipped').order('shipped_at', { ascending: false }).limit(50),
+    ]);
+
+    pendingRequests = pending || [];
+    shippedOrders   = shipped || [];
+
+    document.getElementById('count-pending').textContent = pendingRequests.length;
+    document.getElementById('count-shipped').textContent = shippedOrders.length;
+
+    render();
+  }
+
+  function render() {
+    const content = document.getElementById('content');
+
+    if (currentTab === 'pending') {
+      if (pendingRequests.length === 0) {
+        content.innerHTML = `<div class="empty"><div class="empty-icon">📭</div><div class="empty-text">No pending pickup requests</div></div>`;
+        return;
+      }
+
+      content.innerHTML = pendingRequests.map(req => `
+        <div class="req-card">
+          <div class="req-top">
+            <div>
+              <div class="req-item">${escapeHtml(req.item_title || 'Order')}</div>
+              <div class="req-store">${escapeHtml(req.store_name || '')}</div>
+            </div>
+            <div class="req-value">₦${Number(req.item_value_ngn || 0).toLocaleString()}</div>
+          </div>
+
+          <div class="req-section">
+            <div class="req-label">Pickup From</div>
+            <div class="req-row"><b>${escapeHtml(req.pickup_name || '—')}</b><span>${escapeHtml(req.pickup_phone || '')}</span></div>
+            <div class="req-row"><span>${escapeHtml(req.pickup_address || 'No address')} · ${escapeHtml(req.pickup_state || '')}</span></div>
+          </div>
+
+          <div class="req-section">
+            <div class="req-label">Deliver To</div>
+            <div class="req-row"><b>${escapeHtml(req.delivery_name || '—')}</b><span>${escapeHtml(req.delivery_phone || '')}</span></div>
+            <div class="req-row"><span>${escapeHtml(req.delivery_address || 'No address')} · ${escapeHtml(req.delivery_state || '')}</span></div>
+          </div>
+
+          <div class="req-meta">
+            <span>⚖️ ${req.weight_kg || '—'} kg</span>
+            <span>🕐 ${timeAgo(req.requested_at)}</span>
+          </div>
+
+          ${req.note ? `<div class="req-section" style="margin-bottom:12px"><div class="req-label">Note</div><div class="req-row"><span>${escapeHtml(req.note)}</span></div></div>` : ''}
+
+          <div class="req-actions">
+            <button class="btn btn-primary" onclick="openShipModal('${req.id}','${req.order_id}')">🚚 Mark Shipped</button>
+          </div>
+        </div>
+      `).join('');
+
+    } else {
+      if (shippedOrders.length === 0) {
+        content.innerHTML = `<div class="empty"><div class="empty-icon">📭</div><div class="empty-text">No shipped orders yet</div></div>`;
+        return;
+      }
+
+      content.innerHTML = shippedOrders.map(order => `
+        <div class="req-card">
+          <div class="req-top">
+            <div>
+              <div class="req-item">${escapeHtml(order.title || 'Order')}</div>
+              <div class="req-store">Courier: ${escapeHtml(order.courier || '—')}${order.tracking_number ? ' · ' + escapeHtml(order.tracking_number) : ''}</div>
+            </div>
+            <span class="status-pill status-shipped">Shipped</span>
+          </div>
+          <div class="req-meta">
+            <span>🕐 Shipped ${timeAgo(order.shipped_at)}</span>
+          </div>
+          <div class="req-actions">
+            <button class="btn btn-green" onclick="markDelivered('${order.id}')">✅ Mark Delivered</button>
+          </div>
+        </div>
+      `).join('');
+    }
+  }
+
+  function openShipModal(requestId, orderId) {
+    activeRequestId = requestId;
+    activeOrderId   = orderId;
+    document.getElementById('modal-courier').value = '';
+    document.getElementById('modal-tracking').value = '';
+    document.getElementById('ship-modal').classList.add('show');
+  }
+
+  function closeShipModal() {
+    document.getElementById('ship-modal').classList.remove('show');
+    activeRequestId = null;
+    activeOrderId = null;
+  }
+
+  async function confirmMarkShipped() {
+    const courier  = document.getElementById('modal-courier').value.trim();
+    const tracking = document.getElementById('modal-tracking').value.trim();
+
+    if (!courier) { alert('Enter a courier name'); return; }
+
+    const btn = document.getElementById('modal-confirm-ship');
+    btn.disabled = true;
+    btn.textContent = 'Saving…';
+
+    const autoRelease = new Date();
+    autoRelease.setDate(autoRelease.getDate() + 7);
+
+    // Update the order
+    await supabase.from('orders').update({
+      status: 'shipped',
+      courier,
+      tracking_number: tracking || null,
+      shipped_at: new Date().toISOString(),
+      auto_release_at: autoRelease.toISOString(),
+    }).eq('id', activeOrderId);
+
+    // Mark the pickup request as fulfilled
+    await supabase.from('pickup_requests').update({
+      status: 'fulfilled',
+    }).eq('id', activeRequestId);
+
+    // Notify the buyer
+    const { data: order } = await supabase.from('orders').select('buyer_id,title').eq('id', activeOrderId).single();
+    if (order) {
+      await supabase.from('notifications').insert({
+        user_id: order.buyer_id,
+        type: 'order_shipped',
+        comment_text: `"${order.title || 'Your order'}" has been shipped via ${courier}${tracking ? ` · Tracking: ${tracking}` : ''}. Confirm delivery when it arrives.`,
+        created_at: new Date().toISOString(),
+      });
+    }
+
+    btn.disabled = false;
+    btn.textContent = 'Confirm';
+    closeShipModal();
+    loadData();
+  }
+
+  async function markDelivered(orderId) {
+    if (!confirm('Mark this order as delivered? This will release escrow funds to the seller.')) return;
+
+    // Fetch order for wallet release
+    const { data: order } = await supabase.from('orders').select('*').eq('id', orderId).single();
+    if (!order) { alert('Order not found'); return; }
+
+    // Mark delivered
+    await supabase.from('orders').update({
+      status: 'delivered',
+      delivered_at: new Date().toISOString(),
+    }).eq('id', orderId);
+
+    // Release escrow to seller wallet
+    const { data: sellerWallet } = await supabase.from('wallets').select('*').eq('user_id', order.seller_id).maybeSingle();
+    if (sellerWallet) {
+      await supabase.from('wallets').update({
+        points: (sellerWallet.points || 0) + (order.price_mp || 0),
+      }).eq('user_id', order.seller_id);
+    }
+
+    // Notify seller
+    await supabase.from('notifications').insert({
+      user_id: order.seller_id,
+      type: 'order_delivered',
+      comment_text: `"${order.title || 'Your order'}" was delivered. Funds have been released to your wallet.`,
+      created_at: new Date().toISOString(),
+    });
+
+    loadData();
+  }
+
+  function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str || '';
+    return div.innerHTML;
+  }
+
+  function timeAgo(dateStr) {
+    if (!dateStr) return '—';
+    const diff = Date.now() - new Date(dateStr).getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 60) return `${mins}m ago`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return `${hrs}h ago`;
+    return `${Math.floor(hrs / 24)}d ago`;
+  }
+</script>
+
+</body>
+</html>
