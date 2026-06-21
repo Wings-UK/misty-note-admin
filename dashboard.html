@@ -232,18 +232,37 @@
     const content = document.getElementById('content');
     content.innerHTML = '<div class="loading">Loading…</div>';
 
-    const [{ data: pending }, { data: shipped }] = await Promise.all([
-      sb.from('pickup_requests').select('*').eq('status', 'pending').order('requested_at', { ascending: true }),
-      sb.from('orders').select('*').eq('status', 'shipped').order('shipped_at', { ascending: false }).limit(50),
-    ]);
+    try {
 
-    pendingRequests = pending || [];
-    shippedOrders   = shipped || [];
+      const [pendingRes, shippedRes] = await Promise.all([
+        sb.from('pickup_requests').select('*').eq('status', 'pending').order('requested_at', { ascending: true }),
+        sb.from('orders').select('*').eq('status', 'shipped').order('shipped_at', { ascending: false }).limit(50),
+      ]);
 
-    document.getElementById('count-pending').textContent = pendingRequests.length;
-    document.getElementById('count-shipped').textContent = shippedOrders.length;
+      console.log('Pending requests response:', pendingRes);
+      console.log('Shipped orders response:', shippedRes);
 
-    render();
+      if (pendingRes.error) {
+        content.innerHTML = `<div class="empty"><div class="empty-icon">⚠️</div><div class="empty-text">Pickup requests error: ${escapeHtml(pendingRes.error.message)}</div></div>`;
+        return;
+      }
+      if (shippedRes.error) {
+        content.innerHTML = `<div class="empty"><div class="empty-icon">⚠️</div><div class="empty-text">Orders error: ${escapeHtml(shippedRes.error.message)}</div></div>`;
+        return;
+      }
+
+      pendingRequests = pendingRes.data || [];
+      shippedOrders   = shippedRes.data || [];
+
+      document.getElementById('count-pending').textContent = pendingRequests.length;
+      document.getElementById('count-shipped').textContent = shippedOrders.length;
+
+      render();
+
+    } catch (err) {
+      console.error('loadData failed:', err);
+      content.innerHTML = `<div class="empty"><div class="empty-icon">⚠️</div><div class="empty-text">Failed to load: ${escapeHtml(err.message || 'Unknown error')}</div></div>`;
+    }
   }
 
   function render() {
