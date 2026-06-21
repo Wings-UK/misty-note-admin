@@ -192,23 +192,35 @@
 
   // ── Auth guard ──
   (async () => {
-    const { data: { session } } = await sb.auth.getSession();
-    if (!session) { window.location.href = 'index.html'; return; }
+    try {
+      const { data: { session } } = await sb.auth.getSession();
+      if (!session) { window.location.href = 'index.html'; return; }
 
-    const { data: staff } = await supabase
-      .from('admin_staff')
-      .select('id')
-      .eq('user_id', session.user.id)
-      .maybeSingle();
+      const { data: staff, error: staffErr } = await sb
+        .from('admin_staff')
+        .select('id')
+        .eq('user_id', session.user.id)
+        .maybeSingle();
 
-    if (!staff) {
-      await sb.auth.signOut();
-      window.location.href = 'index.html';
-      return;
+      if (staffErr) {
+        console.error('Staff check error:', staffErr);
+        document.getElementById('content').innerHTML = `<div class="empty"><div class="empty-icon">⚠️</div><div class="empty-text">Auth error: ${staffErr.message}</div></div>`;
+        return;
+      }
+
+      if (!staff) {
+        await sb.auth.signOut();
+        window.location.href = 'index.html';
+        return;
+      }
+
+      document.getElementById('staff-email').textContent = session.user.email;
+      loadData();
+
+    } catch (err) {
+      console.error('Auth guard failed:', err);
+      document.getElementById('content').innerHTML = `<div class="empty"><div class="empty-icon">⚠️</div><div class="empty-text">Failed to initialize: ${err.message || 'Unknown error'}</div></div>`;
     }
-
-    document.getElementById('staff-email').textContent = session.user.email;
-    loadData();
   })();
 
   document.getElementById('signout-btn').onclick = async () => {
