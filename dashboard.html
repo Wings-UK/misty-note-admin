@@ -374,67 +374,122 @@
     const autoRelease = new Date();
     autoRelease.setDate(autoRelease.getDate() + 7);
 
-    // Update the order
-    await sb.from('orders').update({
-      status: 'shipped',
-      courier,
-      tracking_number: tracking || null,
-      shipped_at: new Date().toISOString(),
-      auto_release_at: autoRelease.toISOString(),
-    }).eq('id', activeOrderId);
+    try {
 
-    // Mark the pickup request as fulfilled
-    await sb.from('pickup_requests').update({
-      status: 'fulfilled',
-    }).eq('id', activeRequestId);
+      // Update the order
+      const orderUpdate = await sb.from('orders').update({
+        status: 'shipped',
+        courier,
+        tracking_number: tracking || null,
+        shipped_at: new Date().toISOString(),
+        auto_release_at: autoRelease.toISOString(),
+      }).eq('id', activeOrderId).select();
 
-    // Notify the buyer
-    const { data: order } = await sb.from('orders').select('buyer_id,title').eq('id', activeOrderId).single();
-    if (order) {
-      await sb.from('notifications').insert({
-        user_id: order.buyer_id,
-        type: 'order_shipped',
-        comment_text: `"${order.title || 'Your order'}" has been shipped via ${courier}${tracking ? ` · Tracking: ${tracking}` : ''}. Confirm delivery when it arrives.`,
-        created_at: new Date().toISOString(),
-      });
+      console.log('Order update result:', orderUpdate);
+
+      if (orderUpdate.error) {
+        alert('Failed to update order: ' + orderUpdate.error.message);
+        btn.disabled = false;
+        btn.textContent = 'Confirm';
+        return;
+      }
+
+      if (!orderUpdate.data || orderUpdate.data.length === 0) {
+        alert('Order update affected 0 rows — likely blocked by a database security policy (RLS). The order was NOT marked as shipped.');
+        btn.disabled = false;
+        btn.textContent = 'Confirm';
+        return;
+      }
+
+      // Mark the pickup request as fulfilled
+      const reqUpdate = await sb.from('pickup_requests').update({
+        status: 'fulfilled',
+      }).eq('id', activeRequestId).select();
+
+      console.log('Pickup request update result:', reqUpdate);
+
+      // Notify the buyer
+      const { data: order } = await sb.from('orders').select('buyer_id,title').eq('id', activeOrderId).single();
+      if (order) {
+        await sb.from('notifications').insert({
+          user_id: order.buyer_id,
+          type: 'order_shipped',
+          comment_text: `"${order.title || 'Your order'}" has been shipped via ${courier}${tracking ? ` · Tracking: ${tracking}` : ''}. Confirm delivery when it arrives.`,
+          created_at: new Date().toISOString(),
+        });
+      }
+
+      btn.disabled = false;
+      btn.textContent = 'Confirm';
+      closeShipModal();
+      loadData();
+
+    } catch (err) {
+      console.error('confirmMarkShipped failed:', err);
+      alert('Error: ' + (err.message || 'Unknown error'));
+      btn.disabled = false;
+      btn.textContent = 'Confirm';
     }
-
-    btn.disabled = false;
-    btn.textContent = 'Confirm';
-    closeShipModal();
-    loadData();
   }
 
   async function markDelivered(orderId) {
     if (!confirm('Mark this order as delivered? This will release escrow funds to the seller.')) return;
 
-    // Fetch order for wallet release
-    const { data: order } = await sb.from('orders').select('*').eq('id', orderId).single();
-    if (!order) { alert('Order not found'); return; }
+    try {
 
-    // Mark delivered
-    await sb.from('orders').update({
-      status: 'delivered',
-      delivered_at: new Date().toISOString(),
-    }).eq('id', orderId);
+      // Fetch order for escrow release
+      const { data: order, error: orderErr } = await sb.from('orders').select('*').eq('id', orderId).single();
+      if (orderErr || !order) { alert('Order not found: ' + (orderErr?.message || '')); return; }
 
-    // Release escrow to seller wallet
-    const { data: sellerWallet } = await sb.from('wallets').select('*').eq('user_id', order.seller_id).maybeSingle();
-    if (sellerWallet) {
-      await sb.from('wallets').update({
-        points: (sellerWallet.points || 0) + (order.price_mp || 0),
-      }).eq('user_id', order.seller_id);
+      // Release escrow via the SAME RPC function the main app uses
+      const escrowRes = await sb.rpc('escrow_release_points', {
+        seller_id: order.seller_id,
+        buyer_id:  order.buyer_id,
+        order_id:  order.id,
+        points:    order.price_mp,
+      });
+
+      console.log('Escrow release result:', escrowRes);
+
+      if (escrowRes.error) {
+        alert('Escrow release FAILED: ' + escrowRes.error.message + '\n\nOrder will NOT be marked delivered — fix this first.');
+        return;
+      }
+
+      // Mark delivered — only after escrow succeeds
+      const delUpdate = await sb.from('orders').update({
+        status: 'delivered',
+        delivered_at: new Date().toISOString(),
+        confirmed_at: new Date().toISOString(),
+      }).eq('id', orderId).select();
+
+      console.log('Delivered update result:', delUpdate);
+
+      if (delUpdate.error) { alert('Escrow released, but failed to mark delivered: ' + delUpdate.error.message); return; }
+      if (!delUpdate.data || delUpdate.data.length === 0) {
+        alert('Escrow released, but order update affected 0 rows — likely blocked by RLS.');
+        return;
+      }
+
+      // Update storefront stats (same as main app)
+      try {
+        await sb.rpc('increment_storefront_stats', { p_seller_id: order.seller_id, p_revenue: order.price_ngn || 0 });
+      } catch (e) { console.warn('Storefront stats update failed:', e); }
+
+      // Notify seller
+      await sb.from('notifications').insert({
+        user_id: order.seller_id,
+        type: 'order_delivered',
+        comment_text: `"${order.title || 'Your order'}" was delivered. Funds have been released to your wallet.`,
+        created_at: new Date().toISOString(),
+      });
+
+      loadData();
+
+    } catch (err) {
+      console.error('markDelivered failed:', err);
+      alert('Error: ' + (err.message || 'Unknown error'));
     }
-
-    // Notify seller
-    await sb.from('notifications').insert({
-      user_id: order.seller_id,
-      type: 'order_delivered',
-      comment_text: `"${order.title || 'Your order'}" was delivered. Funds have been released to your wallet.`,
-      created_at: new Date().toISOString(),
-    });
-
-    loadData();
   }
 
   function escapeHtml(str) {
