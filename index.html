@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MistyNote Admin — Login</title>
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --surface: #14141c;
+    --border: #232330;
+    --text: #f5f5f7;
+    --text2: #a8a8b3;
+    --text3: #6b6b78;
+    --accent: #6C47FF;
+    --red: #ff3b5c;
+    --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font);
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+  .card {
+    width: 100%;
+    max-width: 380px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 36px 28px;
+  }
+  .logo {
+    width: 48px;
+    height: 48px;
+    border-radius: 14px;
+    background: linear-gradient(135deg, #FF1080, #7722EE);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 800;
+    font-size: 20px;
+    margin: 0 auto 20px;
+  }
+  h1 {
+    font-size: 18px;
+    font-weight: 700;
+    text-align: center;
+    margin-bottom: 4px;
+    letter-spacing: -0.3px;
+  }
+  .sub {
+    font-size: 13px;
+    color: var(--text3);
+    text-align: center;
+    margin-bottom: 28px;
+  }
+  label {
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text2);
+    margin-bottom: 6px;
+  }
+  input {
+    width: 100%;
+    height: 46px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    color: var(--text);
+    padding: 0 14px;
+    font-size: 14px;
+    font-family: var(--font);
+    margin-bottom: 16px;
+    outline: none;
+  }
+  input:focus { border-color: var(--accent); }
+  button {
+    width: 100%;
+    height: 48px;
+    border-radius: 12px;
+    background: var(--accent);
+    color: white;
+    border: none;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    font-family: var(--font);
+  }
+  button:disabled { opacity: 0.6; cursor: not-allowed; }
+  .error {
+    background: rgba(255,59,92,0.1);
+    color: var(--red);
+    border-radius: 10px;
+    padding: 10px 12px;
+    font-size: 13px;
+    margin-bottom: 16px;
+    display: none;
+  }
+  .error.show { display: block; }
+</style>
+</head>
+<body>
+
+<div class="card">
+  <div class="logo">M</div>
+  <h1>MistyNote Admin</h1>
+  <div class="sub">Staff sign in</div>
+
+  <div class="error" id="error"></div>
+
+  <form id="login-form">
+    <label for="email">Email</label>
+    <input type="email" id="email" placeholder="you@mistynote.co" required autocomplete="email">
+
+    <label for="password">Password</label>
+    <input type="password" id="password" placeholder="••••••••" required autocomplete="current-password">
+
+    <button type="submit" id="submit-btn">Sign In</button>
+  </form>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+  // ── Same Supabase project as the main MistyNote app ──
+  const SUPABASE_URL = 'https://rhmknjlxddxkfyjbcfgjj.supabase.co';
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJobWtuamx4ZGR4a2Z5YmNmZ2pqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk0MzM4OTgsImV4cCI6MjA4NTAwOTg5OH0.dNBxXmIdYAxJT-bt1WWcO62Nobt8aDLTRdnrs5g1CCI';
+
+  const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  const form      = document.getElementById('login-form');
+  const errorBox  = document.getElementById('error');
+  const submitBtn = document.getElementById('submit-btn');
+
+  // If already logged in, go straight to dashboard
+  (async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session) window.location.href = 'dashboard.html';
+  })();
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const email    = document.getElementById('email').value.trim();
+    const password = document.getElementById('password').value;
+
+    errorBox.classList.remove('show');
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Signing in…';
+
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+
+    if (error) {
+      errorBox.textContent = error.message === 'Invalid login credentials'
+        ? 'Wrong email or password'
+        : error.message;
+      errorBox.classList.add('show');
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Sign In';
+      return;
+    }
+
+    // Check this user is an approved staff member
+    const { data: staff } = await supabase
+      .from('admin_staff')
+      .select('id')
+      .eq('user_id', data.user.id)
+      .maybeSingle();
+
+    if (!staff) {
+      errorBox.textContent = 'This account is not authorized for admin access';
+      errorBox.classList.add('show');
+      await supabase.auth.signOut();
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Sign In';
+      return;
+    }
+
+    window.location.href = 'dashboard.html';
+  });
+</script>
+
+</body>
+</html>
