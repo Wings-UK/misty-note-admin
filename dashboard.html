@@ -184,7 +184,7 @@
   const SUPABASE_URL = 'https://rhmknjlxddxkfyjbcfgjj.supabase.co';
   const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJobWtuamx4ZGR4a2Z5YmNmZ2pqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk0MzM4OTgsImV4cCI6MjA4NTAwOTg5OH0.dNBxXmIdYAxJT-bt1WWcO62Nobt8aDLTRdnrs5g1CCI';
 
-  const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
   let currentTab = 'pending';
   let activeRequestId = null;
@@ -192,7 +192,7 @@
 
   // ── Auth guard ──
   (async () => {
-    const { data: { session } } = await supabase.auth.getSession();
+    const { data: { session } } = await sb.auth.getSession();
     if (!session) { window.location.href = 'index.html'; return; }
 
     const { data: staff } = await supabase
@@ -202,7 +202,7 @@
       .maybeSingle();
 
     if (!staff) {
-      await supabase.auth.signOut();
+      await sb.auth.signOut();
       window.location.href = 'index.html';
       return;
     }
@@ -212,7 +212,7 @@
   })();
 
   document.getElementById('signout-btn').onclick = async () => {
-    await supabase.auth.signOut();
+    await sb.auth.signOut();
     window.location.href = 'index.html';
   };
 
@@ -233,8 +233,8 @@
     content.innerHTML = '<div class="loading">Loading…</div>';
 
     const [{ data: pending }, { data: shipped }] = await Promise.all([
-      supabase.from('pickup_requests').select('*').eq('status', 'pending').order('requested_at', { ascending: true }),
-      supabase.from('orders').select('*').eq('status', 'shipped').order('shipped_at', { ascending: false }).limit(50),
+      sb.from('pickup_requests').select('*').eq('status', 'pending').order('requested_at', { ascending: true }),
+      sb.from('orders').select('*').eq('status', 'shipped').order('shipped_at', { ascending: false }).limit(50),
     ]);
 
     pendingRequests = pending || [];
@@ -344,7 +344,7 @@
     autoRelease.setDate(autoRelease.getDate() + 7);
 
     // Update the order
-    await supabase.from('orders').update({
+    await sb.from('orders').update({
       status: 'shipped',
       courier,
       tracking_number: tracking || null,
@@ -353,14 +353,14 @@
     }).eq('id', activeOrderId);
 
     // Mark the pickup request as fulfilled
-    await supabase.from('pickup_requests').update({
+    await sb.from('pickup_requests').update({
       status: 'fulfilled',
     }).eq('id', activeRequestId);
 
     // Notify the buyer
-    const { data: order } = await supabase.from('orders').select('buyer_id,title').eq('id', activeOrderId).single();
+    const { data: order } = await sb.from('orders').select('buyer_id,title').eq('id', activeOrderId).single();
     if (order) {
-      await supabase.from('notifications').insert({
+      await sb.from('notifications').insert({
         user_id: order.buyer_id,
         type: 'order_shipped',
         comment_text: `"${order.title || 'Your order'}" has been shipped via ${courier}${tracking ? ` · Tracking: ${tracking}` : ''}. Confirm delivery when it arrives.`,
@@ -378,25 +378,25 @@
     if (!confirm('Mark this order as delivered? This will release escrow funds to the seller.')) return;
 
     // Fetch order for wallet release
-    const { data: order } = await supabase.from('orders').select('*').eq('id', orderId).single();
+    const { data: order } = await sb.from('orders').select('*').eq('id', orderId).single();
     if (!order) { alert('Order not found'); return; }
 
     // Mark delivered
-    await supabase.from('orders').update({
+    await sb.from('orders').update({
       status: 'delivered',
       delivered_at: new Date().toISOString(),
     }).eq('id', orderId);
 
     // Release escrow to seller wallet
-    const { data: sellerWallet } = await supabase.from('wallets').select('*').eq('user_id', order.seller_id).maybeSingle();
+    const { data: sellerWallet } = await sb.from('wallets').select('*').eq('user_id', order.seller_id).maybeSingle();
     if (sellerWallet) {
-      await supabase.from('wallets').update({
+      await sb.from('wallets').update({
         points: (sellerWallet.points || 0) + (order.price_mp || 0),
       }).eq('user_id', order.seller_id);
     }
 
     // Notify seller
-    await supabase.from('notifications').insert({
+    await sb.from('notifications').insert({
       user_id: order.seller_id,
       type: 'order_delivered',
       comment_text: `"${order.title || 'Your order'}" was delivered. Funds have been released to your wallet.`,
