@@ -441,12 +441,9 @@
       const { data: order, error: orderErr } = await sb.from('orders').select('*').eq('id', orderId).single();
       if (orderErr || !order) { alert('Order not found: ' + (orderErr?.message || '')); return; }
 
-      // Release escrow via the SAME RPC function the main app uses
+      // Release escrow — function looks up the hold itself from order_id
       const escrowRes = await sb.rpc('escrow_release_points', {
-        seller_id: order.seller_id,
-        buyer_id:  order.buyer_id,
-        order_id:  order.id,
-        points:    order.price_mp,
+        p_order_id: order.id,
       });
 
       console.log('Escrow release result:', escrowRes);
