@@ -448,7 +448,7 @@ async function createPrediction() {
   }
 
   const { error: optErr } = await sb.from('prediction_options').insert(
-    options.map((label, i) => ({ prediction_id: pred.id, label, total_staked: 0, sort_order: i }))
+    options.map((label) => ({ prediction_id: pred.id, label, total_staked: 0 }))
   );
 
   btn.disabled = false; btn.textContent = 'Publish market';
