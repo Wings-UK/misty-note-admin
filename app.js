@@ -362,8 +362,11 @@ async function loadPulseOverview() {
 
 function renderMarketCards(rows, showResolve) {
   if (!rows.length) return '<div class="muted-center">Nothing here</div>';
-  return rows.map(p => `
-    <div class="market-card">
+  return rows.map(p => {
+    const canResolve = p.status !== 'resolved';
+    const titleJs = String(p.title || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+    return `
+    <div class="market-card" id="mcard-${p.id}">
       <div class="market-title">${esc(p.title)}</div>
       <div class="market-meta">
         ${statusBadge(p)}
@@ -372,11 +375,57 @@ function renderMarketCards(rows, showResolve) {
         <span>${p.stake_count || 0} stakers</span>
         <span>${fmtTime(p.closes_at)}</span>
       </div>
-      ${showResolve || p.status === 'open' ? `
-        <div class="market-actions">
-          <button class="btn btn-primary btn-sm" onclick="goResolve('${p.id}')">Resolve</button>
-        </div>` : ''}
-    </div>`).join('');
+      <div class="market-actions">
+        ${canResolve ? `<button class="btn btn-primary btn-sm" onclick="goResolve('${p.id}')">Resolve</button>` : ''}
+        <button class="btn btn-danger btn-sm" onclick="deletePrediction('${p.id}', '${titleJs}', ${Number(p.total_pool)||0}, ${Number(p.stake_count)||0})">Delete</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function deletePrediction(id, title, pool, stakeCount) {
+  const hasActivity = Number(pool) > 0 || Number(stakeCount) > 0;
+  const msg = hasActivity
+    ? `"${title}" already has stakes/pool.\n\nPending stakes will be refunded, then the market will be permanently deleted.\n\nContinue?`
+    : `Delete "${title}"?\n\nThis cannot be undone.`;
+  if (!confirm(msg)) return;
+
+  try {
+    if (hasActivity) {
+      // Refund any pending stakes first
+      const voidRes = await sb.rpc('void_prediction', {
+        p_prediction_id: id,
+        p_resolved_by: currentUser?.id || null,
+      });
+      if (voidRes.error && !String(voidRes.error.message || '').includes('Already resolved')) {
+        // If not unresolved, try continue with deletes anyway for mistaken drafts
+        console.warn('void_prediction:', voidRes.error);
+      }
+    }
+
+    // Remove child rows then parent (order matters if no CASCADE)
+    const s1 = await sb.from('prediction_stakes').delete().eq('prediction_id', id);
+    if (s1.error) {
+      toast('Could not delete stakes: ' + s1.error.message, 'error');
+      return;
+    }
+    const s2 = await sb.from('prediction_options').delete().eq('prediction_id', id);
+    if (s2.error) {
+      toast('Could not delete options: ' + s2.error.message, 'error');
+      return;
+    }
+    const s3 = await sb.from('predictions').delete().eq('id', id);
+    if (s3.error) {
+      toast('Could not delete market: ' + s3.error.message, 'error');
+      return;
+    }
+
+    toast('Market deleted');
+    document.getElementById('mcard-' + id)?.remove();
+    if (currentSection === 'pulse') refreshPulse();
+  } catch (err) {
+    toast(err.message || 'Delete failed', 'error');
+  }
 }
 
 function goResolve(id) {
