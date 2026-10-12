@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>MistyNote Admin</title>
+<link rel="stylesheet" href="app.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+
+<!-- Header -->
+<header class="header">
+  <div class="brand">
+    <div class="brand-logo">M</div>
+    <div>
+      <div class="brand-text">MistyNote Admin</div>
+      <div class="brand-sub" id="staff-email">—</div>
+    </div>
+  </div>
+  <button class="icon-btn" id="signout-btn" title="Sign out">⎋</button>
+</header>
+
+<!-- Section switcher (Shipping | Pulse) -->
+<div class="section-tabs" id="section-tabs">
+  <button class="section-tab active" data-section="shipping" onclick="switchSection('shipping')">📦 Shipping</button>
+  <button class="section-tab" data-section="pulse" onclick="switchSection('pulse')">◎ Pulse</button>
+</div>
+
+<main id="main">
+
+  <!-- ═══════════════ SHIPPING ═══════════════ -->
+  <div id="section-shipping" class="section active">
+    <div class="sub-tabs" id="ship-tabs">
+      <button class="sub-tab active" data-tab="pending" onclick="setShipTab('pending')">
+        Pending <span class="count" id="count-pending">0</span>
+      </button>
+      <button class="sub-tab" data-tab="shipped" onclick="setShipTab('shipped')">
+        Shipped <span class="count" id="count-shipped">0</span>
+      </button>
+    </div>
+    <div id="ship-content"><div class="loading">Loading…</div></div>
+  </div>
+
+  <!-- ═══════════════ PULSE ═══════════════ -->
+  <div id="section-pulse" class="section">
+    <div class="sub-tabs" id="pulse-tabs">
+      <button class="sub-tab active" data-tab="overview" onclick="setPulseTab('overview')">Overview</button>
+      <button class="sub-tab" data-tab="markets" onclick="setPulseTab('markets')">Markets</button>
+      <button class="sub-tab" data-tab="create" onclick="setPulseTab('create')">+ New</button>
+      <button class="sub-tab" data-tab="resolve" onclick="setPulseTab('resolve')">Resolve</button>
+      <button class="sub-tab" data-tab="stakes" onclick="setPulseTab('stakes')">Stakes</button>
+    </div>
+
+    <!-- Overview -->
+    <div id="pulse-overview" class="pulse-pane active">
+      <div class="stat-grid" id="pulse-stats"></div>
+      <div class="card">
+        <div class="card-head">Needs resolution</div>
+        <div id="pulse-needs-resolve"><div class="loading">Loading…</div></div>
+      </div>
+      <div class="card">
+        <div class="card-head">Open markets</div>
+        <div id="pulse-open-list"><div class="loading">Loading…</div></div>
+      </div>
+    </div>
+
+    <!-- Markets list -->
+    <div id="pulse-markets" class="pulse-pane">
+      <div class="filter-row">
+        <button class="chip active" data-f="open" onclick="setMarketFilter('open')">Open</button>
+        <button class="chip" data-f="closed" onclick="setMarketFilter('closed')">Closed</button>
+        <button class="chip" data-f="resolved" onclick="setMarketFilter('resolved')">Resolved</button>
+        <button class="chip" data-f="all" onclick="setMarketFilter('all')">All</button>
+      </div>
+      <div id="pulse-markets-list"><div class="loading">Loading…</div></div>
+    </div>
+
+    <!-- Create -->
+    <div id="pulse-create" class="pulse-pane">
+      <div class="card form-card">
+        <div class="card-head">New prediction</div>
+        <label class="label">Title *</label>
+        <input id="c-title" class="field" maxlength="160" placeholder="Who wins…?">
+        <label class="label">Description / rules</label>
+        <textarea id="c-desc" class="field textarea" rows="3" placeholder="How this resolves…"></textarea>
+        <div class="row-2">
+          <div>
+            <label class="label">Category</label>
+            <select id="c-category" class="field">
+              <option>Politics</option><option>Entertainment</option><option>Sports</option>
+              <option>Economy</option><option>Social</option><option>General</option>
+            </select>
+          </div>
+          <div>
+            <label class="label">Closes at *</label>
+            <input id="c-closes" type="datetime-local" class="field">
+          </div>
+        </div>
+        <label class="label">Options * (min 2)</label>
+        <div id="c-options">
+          <div class="opt-row"><input class="field c-opt" placeholder="Option A" maxlength="80"></div>
+          <div class="opt-row"><input class="field c-opt" placeholder="Option B" maxlength="80"></div>
+        </div>
+        <button type="button" class="btn btn-ghost btn-sm" onclick="addOptRow()">+ Add option</button>
+        <p class="err" id="c-error"></p>
+        <button class="btn btn-primary btn-block" id="c-submit" onclick="createPrediction()">Publish market</button>
+      </div>
+    </div>
+
+    <!-- Resolve -->
+    <div id="pulse-resolve" class="pulse-pane">
+      <div class="card form-card">
+        <div class="card-head">Resolve market</div>
+        <p class="hint">Pick winner → pay parimutuel (92% pool). Void refunds everyone.</p>
+        <label class="label">Market</label>
+        <select id="r-pred" class="field" onchange="onResolveChange()">
+          <option value="">Select…</option>
+        </select>
+        <div id="r-detail" class="hidden">
+          <div class="resolve-meta" id="r-meta"></div>
+          <label class="label">Winning option</label>
+          <div id="r-options"></div>
+          <p class="err" id="r-error"></p>
+          <div class="btn-row">
+            <button class="btn btn-primary" id="r-submit" onclick="submitResolve()" disabled>Resolve & pay</button>
+            <button class="btn btn-danger" id="r-void" onclick="submitVoid()" disabled>Void & refund</button>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-head">Recently resolved</div>
+        <div id="r-recent"><div class="muted-center">—</div></div>
+      </div>
+    </div>
+
+    <!-- Stakes -->
+    <div id="pulse-stakes" class="pulse-pane">
+      <div class="filter-row">
+        <select id="stakes-status" class="field field-sm" onchange="loadStakes()">
+          <option value="">All statuses</option>
+          <option value="pending">Pending</option>
+          <option value="won">Won</option>
+          <option value="lost">Lost</option>
+          <option value="refunded">Refunded</option>
+        </select>
+      </div>
+      <div id="stakes-list"><div class="loading">Loading…</div></div>
+    </div>
+  </div>
+
+</main>
+
+<!-- Ship modal -->
+<div class="modal-overlay" id="ship-modal">
+  <div class="modal">
+    <h2>Mark as Shipped</h2>
+    <label class="label">Courier Name</label>
+    <input type="text" id="modal-courier" class="field" placeholder="e.g. GIG Logistics, DHL">
+    <label class="label">Tracking Number (optional)</label>
+    <input type="text" id="modal-tracking" class="field" placeholder="Waybill / tracking">
+    <div class="btn-row">
+      <button class="btn btn-ghost" onclick="closeShipModal()">Cancel</button>
+      <button class="btn btn-primary" id="modal-confirm-ship" onclick="confirmMarkShipped()">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="toast hidden"></div>
+
+<script src="app.js"></script>
+</body>
+</html>
