@@ -464,9 +464,51 @@ function addOptRow() {
   const wrap = document.getElementById('c-options');
   const div = document.createElement('div');
   div.className = 'opt-row';
-  div.innerHTML = '<input class="field c-opt" placeholder="Option" maxlength="80">';
+  div.innerHTML =
+    '<input class="field c-opt" placeholder="Option" maxlength="80">' +
+    '<input class="field c-prob" type="number" min="1" max="99" step="1" placeholder="%" value="0">';
   wrap.appendChild(div);
+  const probs = [...wrap.querySelectorAll('.c-prob')];
+  if (probs.length) {
+    const even = Math.floor(100 / probs.length);
+    let left = 100;
+    probs.forEach((p, i) => {
+      const v = i === probs.length - 1 ? left : even;
+      p.value = v;
+      left -= even;
+    });
+  }
+  updateProbSum();
+  wrap.querySelectorAll('.c-prob').forEach(el => {
+    el.oninput = updateProbSum;
+  });
 }
+
+function equalizeOpeningProbs() {
+  const probs = [...document.querySelectorAll('#c-options .c-prob')];
+  if (!probs.length) return;
+  const even = Math.floor(100 / probs.length);
+  let left = 100;
+  probs.forEach((p, i) => {
+    const v = i === probs.length - 1 ? left : even;
+    p.value = v;
+    left -= even;
+  });
+  updateProbSum();
+}
+
+function updateProbSum() {
+  const el = document.getElementById('c-prob-sum');
+  if (!el) return;
+  const sum = [...document.querySelectorAll('#c-options .c-prob')]
+    .reduce((s, i) => s + (parseFloat(i.value) || 0), 0);
+  el.textContent = 'Sum: ' + sum + '%';
+  el.style.color = Math.abs(sum - 100) < 0.5 ? 'var(--green)' : 'var(--red)';
+}
+
+document.addEventListener('input', (e) => {
+  if (e.target && e.target.classList && e.target.classList.contains('c-prob')) updateProbSum();
+});
 
 async function createPrediction() {
   const title = document.getElementById('c-title').value.trim();
@@ -477,10 +519,19 @@ async function createPrediction() {
   const btn = document.getElementById('c-submit');
   errEl.textContent = '';
 
-  const options = [...document.querySelectorAll('.c-opt')].map(i => i.value.trim()).filter(Boolean);
+  const rows = [...document.querySelectorAll('#c-options .opt-row')].map(row => ({
+    label: (row.querySelector('.c-opt')?.value || '').trim(),
+    pct: parseFloat(row.querySelector('.c-prob')?.value) || 0,
+  })).filter(r => r.label);
+
   if (!title) { errEl.textContent = 'Title required'; return; }
   if (!closesLocal) { errEl.textContent = 'Close time required'; return; }
-  if (options.length < 2) { errEl.textContent = 'Need at least 2 options'; return; }
+  if (rows.length < 2) { errEl.textContent = 'Need at least 2 options'; return; }
+  const pctSum = rows.reduce((s, r) => s + r.pct, 0);
+  if (Math.abs(pctSum - 100) > 0.5) {
+    errEl.textContent = 'Opening % must total 100 (now ' + pctSum + '). Use Equalize or fix values.';
+    return;
+  }
   const closes_at = new Date(closesLocal).toISOString();
   if (new Date(closes_at) <= new Date()) { errEl.textContent = 'Close time must be in the future'; return; }
 
@@ -497,16 +548,31 @@ async function createPrediction() {
   }
 
   const { error: optErr } = await sb.from('prediction_options').insert(
-    options.map((label) => ({ prediction_id: pred.id, label, total_staked: 0 }))
+    rows.map((r) => ({
+      prediction_id: pred.id,
+      label: r.label,
+      total_staked: 0,
+      opening_prob: Math.round((r.pct / 100) * 10000) / 10000, // 0–1
+    }))
   );
 
   btn.disabled = false; btn.textContent = 'Publish market';
-  if (optErr) { errEl.textContent = 'Options failed: ' + optErr.message; return; }
+  if (optErr) {
+    errEl.textContent = 'Options failed: ' + optErr.message +
+      (String(optErr.message).includes('opening_prob')
+        ? ' — Run the SQL to add opening_prob column first.'
+        : '');
+    return;
+  }
 
-  toast('Market published');
+  toast('Market published with opening odds');
   document.getElementById('c-title').value = '';
   document.getElementById('c-desc').value = '';
-  document.querySelectorAll('.c-opt').forEach((i, idx) => { i.value = ''; if (idx > 1) i.closest('.opt-row')?.remove(); });
+  const wrap = document.getElementById('c-options');
+  wrap.innerHTML =
+    '<div class="opt-row"><input class="field c-opt" placeholder="Option A" maxlength="80"><input class="field c-prob" type="number" min="1" max="99" step="1" placeholder="%" value="50"></div>' +
+    '<div class="opt-row"><input class="field c-opt" placeholder="Option B" maxlength="80"><input class="field c-prob" type="number" min="1" max="99" step="1" placeholder="%" value="50"></div>';
+  updateProbSum();
   setPulseTab('markets');
   setMarketFilter('open');
 }
