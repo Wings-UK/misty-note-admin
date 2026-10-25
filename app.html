@@ -97,12 +97,23 @@
             <input id="c-closes" type="datetime-local" class="field">
           </div>
         </div>
-        <label class="label">Options * (min 2)</label>
+        <label class="label">Options * (min 2) — set opening %</label>
+        <p class="hint" style="font-size:12px;color:var(--text3);margin:0 0 8px">Opening % = your prior before real stakes. Must total 100%. Odds shown until money moves the market.</p>
         <div id="c-options">
-          <div class="opt-row"><input class="field c-opt" placeholder="Option A" maxlength="80"></div>
-          <div class="opt-row"><input class="field c-opt" placeholder="Option B" maxlength="80"></div>
+          <div class="opt-row">
+            <input class="field c-opt" placeholder="Option A" maxlength="80">
+            <input class="field c-prob" type="number" min="1" max="99" step="1" placeholder="%" value="50">
+          </div>
+          <div class="opt-row">
+            <input class="field c-opt" placeholder="Option B" maxlength="80">
+            <input class="field c-prob" type="number" min="1" max="99" step="1" placeholder="%" value="50">
+          </div>
         </div>
-        <button type="button" class="btn btn-ghost btn-sm" onclick="addOptRow()">+ Add option</button>
+        <div class="row-actions" style="display:flex;flex-wrap:wrap;gap:8px;margin:8px 0 12px">
+          <button type="button" class="btn btn-ghost btn-sm" onclick="addOptRow()">+ Add option</button>
+          <button type="button" class="btn btn-ghost btn-sm" onclick="equalizeOpeningProbs()">Equalize %</button>
+          <span id="c-prob-sum" style="font-size:12px;color:var(--text3);align-self:center">Sum: 100%</span>
+        </div>
         <p class="err" id="c-error"></p>
         <button class="btn btn-primary btn-block" id="c-submit" onclick="createPrediction()">Publish market</button>
       </div>
